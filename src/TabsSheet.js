@@ -4,12 +4,12 @@ import {
 	View,
 	Text,
 	FlatList,
-	TouchableOpacity,
 	StyleSheet,
 	Animated,
 	PanResponder,
 	Pressable,
 } from 'react-native'
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
 import { colors, spacing, radius, font, shadow } from './theme'
 import { getDisplayUrl } from './utils'
 import useBrowserStore from './store'
@@ -57,24 +57,23 @@ const TabsSheet = ({ visible, onClose }) => {
 		const isActive = index === activeTabIndex
 		const letter = (item.title || item.url || '?').trim().charAt(0).toUpperCase() || '?'
 		return (
-			<TouchableOpacity
-				activeOpacity={0.85}
+			<Pressable
 				onPress={() => handleOpenTab(index)}
-				style={[styles.tabRow, isActive && styles.tabRowActive]}>
+				style={({ pressed }) => [styles.row, isActive && styles.rowActive, pressed && { backgroundColor: colors.bg3 }]}>
 				<View style={[styles.thumb, { backgroundColor: colors.bg3 }]}>
 					<Text style={styles.thumbText}>{letter}</Text>
 				</View>
-				<View style={styles.tabMeta}>
-					<Text style={styles.tabTitle} numberOfLines={1}>{item.title || 'New Tab'}</Text>
-					<Text style={styles.tabUrl} numberOfLines={1}>{getDisplayUrl(item.url) || 'about:blank'}</Text>
+				<View style={styles.meta}>
+					<Text style={styles.title} numberOfLines={1}>{item.title || 'New Tab'}</Text>
+					<Text style={styles.url} numberOfLines={1}>{getDisplayUrl(item.url) || 'about:blank'}</Text>
 				</View>
-				<TouchableOpacity
+				<Pressable
 					hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 					onPress={() => closeTab(item.id)}
-					style={styles.closeBtn}>
-					<Text style={styles.closeBtnText}>×</Text>
-				</TouchableOpacity>
-			</TouchableOpacity>
+					style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}>
+					<Icon name="close" size={20} color={colors.text1} />
+				</Pressable>
+			</Pressable>
 		)
 	}
 
@@ -86,8 +85,13 @@ const TabsSheet = ({ visible, onClose }) => {
 					<View style={styles.handle} />
 				</View>
 				<View style={styles.header}>
-					<Text style={styles.headerTitle}>Tabs</Text>
-					<Text style={styles.headerCount}>{tabs.length}</Text>
+					<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+						<Text style={styles.headerTitle}>Tabs</Text>
+						<Text style={styles.headerCount}>{tabs.length}</Text>
+					</View>
+					<Pressable onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={({pressed}) => pressed && {opacity: 0.6}}>
+						<Icon name="close" size={24} color={colors.text1} />
+					</Pressable>
 				</View>
 				<FlatList
 					data={tabs}
@@ -95,9 +99,10 @@ const TabsSheet = ({ visible, onClose }) => {
 					renderItem={renderItem}
 					contentContainerStyle={styles.listContent}
 				/>
-				<TouchableOpacity style={styles.newTabBtn} onPress={handleNewTab} activeOpacity={0.85}>
-					<Text style={styles.newTabText}>+ New Tab</Text>
-				</TouchableOpacity>
+				<Pressable style={({ pressed }) => [styles.newTabBtn, pressed && { backgroundColor: colors.bg3 }]} onPress={handleNewTab}>
+					<Icon name="plus" size={20} color={colors.accent} style={{marginRight: 8}} />
+					<Text style={styles.newTabText}>New Tab</Text>
+				</Pressable>
 			</Animated.View>
 		</Modal>
 	)
@@ -128,22 +133,27 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	handle: {
-		width: 36,
+		width: 40,
 		height: 4,
 		borderRadius: radius.full,
-		backgroundColor: colors.border2,
+		backgroundColor: colors.bg2,
+		marginBottom: spacing.md,
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: spacing.lg,
-		paddingVertical: spacing.sm,
+		paddingBottom: spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: colors.border0,
+		marginBottom: spacing.md,
 	},
 	headerTitle: {
 		color: colors.text0,
 		fontSize: font.lg,
-		fontWeight: font.semibold,
+		fontWeight: 'bold',
+		marginRight: spacing.sm,
 	},
 	headerCount: {
 		color: colors.text1,
@@ -153,22 +163,19 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing.lg,
 		paddingBottom: spacing.lg,
 	},
-	tabRow: {
+	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		padding: spacing.md,
-		borderRadius: radius.md,
-		backgroundColor: colors.bg2,
-		borderWidth: 1,
-		borderColor: colors.border0,
-		marginBottom: spacing.sm,
+		paddingVertical: spacing.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: colors.border0,
 	},
-	tabRowActive: {
-		borderColor: colors.accent,
+	rowActive: {
+		backgroundColor: colors.bg2,
 	},
 	thumb: {
-		width: 44,
-		height: 44,
+		width: 36,
+		height: 36,
 		borderRadius: radius.md,
 		alignItems: 'center',
 		justifyContent: 'center',
@@ -176,36 +183,33 @@ const styles = StyleSheet.create({
 	},
 	thumbText: {
 		color: colors.text0,
-		fontSize: font.lg,
-		fontWeight: font.bold,
+		fontSize: font.md,
+		fontWeight: 'bold',
 	},
-	tabMeta: {
+	meta: {
 		flex: 1,
 		minWidth: 0,
 	},
-	tabTitle: {
+	title: {
 		color: colors.text0,
 		fontSize: font.md,
 		fontWeight: font.medium,
 	},
-	tabUrl: {
+	url: {
 		color: colors.text1,
 		fontSize: font.xs,
 		marginTop: 2,
 	},
-	closeBtn: {
+	actionBtn: {
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
-	},
-	closeBtnText: {
-		color: colors.text1,
-		fontSize: font.xl,
-		lineHeight: font.xl,
 	},
 	newTabBtn: {
 		marginHorizontal: spacing.lg,
 		paddingVertical: spacing.md,
+		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'center',
 		borderRadius: radius.md,
 		backgroundColor: colors.accentSoft,
 		borderWidth: 1,

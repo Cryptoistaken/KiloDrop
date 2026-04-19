@@ -4,12 +4,12 @@ import {
 	View,
 	Text,
 	FlatList,
-	TouchableOpacity,
 	StyleSheet,
 	Animated,
 	PanResponder,
 	Pressable,
 } from 'react-native'
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
 import { colors, spacing, radius, font, shadow } from './theme'
 import { getDisplayUrl } from './utils'
 import useBrowserStore from './store'
@@ -45,24 +45,24 @@ const BookmarksSheet = ({ visible, onClose, onNavigate }) => {
 	}
 
 	const renderItem = ({ item }) => (
-		<TouchableOpacity
-			activeOpacity={0.85}
+		<Pressable
 			onPress={() => handleOpen(item.url)}
-			style={styles.row}>
+			style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.bg3 }]}>
 			<View style={styles.icon}>
-				<Text style={styles.iconText}>◎</Text>
+				<Icon name="bookmark-outline" size={20} color={colors.accent} />
 			</View>
 			<View style={styles.meta}>
 				<Text style={styles.title} numberOfLines={1}>{item.title || item.url}</Text>
 				<Text style={styles.url} numberOfLines={1}>{getDisplayUrl(item.url)}</Text>
 			</View>
-			<TouchableOpacity
+			<Pressable
 				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 				onPress={() => toggleBookmark(item.url, item.title)}
-				style={styles.deleteBtn}>
-				<Text style={styles.deleteBtnText}>×</Text>
-			</TouchableOpacity>
-		</TouchableOpacity>
+				style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}>
+				<Icon name="close" size={20} color={colors.text1} />
+			</Pressable>
+			<Icon name="chevron-right" size={20} color={colors.text1} style={{ marginLeft: spacing.sm }} />
+		</Pressable>
 	)
 
 	return (
@@ -74,10 +74,13 @@ const BookmarksSheet = ({ visible, onClose, onNavigate }) => {
 				</View>
 				<View style={styles.header}>
 					<Text style={styles.headerTitle}>Bookmarks</Text>
-					<Text style={styles.headerCount}>{bookmarks.length}</Text>
+					<Pressable onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={({pressed}) => pressed && {opacity: 0.6}}>
+						<Icon name="close" size={24} color={colors.text1} />
+					</Pressable>
 				</View>
 				{bookmarks.length === 0 ? (
 					<View style={styles.empty}>
+						<Icon name="bookmark-off-outline" size={48} color={colors.text2} style={{ marginBottom: spacing.sm }} />
 						<Text style={styles.emptyText}>No bookmarks yet</Text>
 					</View>
 				) : (
@@ -118,26 +121,26 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	handle: {
-		width: 36,
+		width: 40,
 		height: 4,
 		borderRadius: radius.full,
-		backgroundColor: colors.border2,
+		backgroundColor: colors.bg2,
+		marginBottom: spacing.md,
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: spacing.lg,
-		paddingVertical: spacing.sm,
+		paddingBottom: spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: colors.border0,
+		marginBottom: spacing.md,
 	},
 	headerTitle: {
 		color: colors.text0,
 		fontSize: font.lg,
-		fontWeight: font.semibold,
-	},
-	headerCount: {
-		color: colors.text1,
-		fontSize: font.sm,
+		fontWeight: 'bold',
 	},
 	listContent: {
 		paddingHorizontal: spacing.lg,
@@ -146,12 +149,9 @@ const styles = StyleSheet.create({
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		padding: spacing.md,
-		borderRadius: radius.md,
-		backgroundColor: colors.bg2,
-		borderWidth: 1,
-		borderColor: colors.border0,
-		marginBottom: spacing.sm,
+		paddingVertical: spacing.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: colors.border0,
 	},
 	icon: {
 		width: 36,
@@ -161,10 +161,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: spacing.md,
-	},
-	iconText: {
-		color: colors.accent,
-		fontSize: font.lg,
 	},
 	meta: {
 		flex: 1,
@@ -180,14 +176,9 @@ const styles = StyleSheet.create({
 		fontSize: font.xs,
 		marginTop: 2,
 	},
-	deleteBtn: {
+	actionBtn: {
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
-	},
-	deleteBtnText: {
-		color: colors.text1,
-		fontSize: font.xl,
-		lineHeight: font.xl,
 	},
 	empty: {
 		paddingVertical: spacing.xxxl,

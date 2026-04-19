@@ -1,18 +1,20 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, useEffect } from 'react'
 import {
 	SafeAreaView,
 	StatusBar,
 	View,
 	Text,
 	TextInput,
-	TouchableOpacity,
 	StyleSheet,
 	Modal,
 	Pressable,
 	Share,
 	useWindowDimensions,
+	Animated,
+	Easing,
 } from 'react-native'
 import { WebView } from 'react-native-webview'
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
 import Clipboard from '@react-native-clipboard/clipboard'
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -69,6 +71,32 @@ const BrowserScreen = () => {
 	const [showHistory, setShowHistory] = useState(false)
 
 	const activeRef = activeTab ? webViewRefs.current[activeTab.id] : null
+	const spinValue = useRef(new Animated.Value(0)).current
+
+	useEffect(() => {
+		let anim
+		if (isLoading) {
+			spinValue.setValue(0)
+			anim = Animated.loop(
+				Animated.timing(spinValue, {
+					toValue: 1,
+					duration: 1000,
+					easing: Easing.linear,
+					useNativeDriver: true,
+				})
+			)
+			anim.start()
+		} else {
+			spinValue.stopAnimation()
+			spinValue.setValue(0)
+		}
+		return () => anim && anim.stop()
+	}, [isLoading, spinValue])
+
+	const spinRotate = spinValue.interpolate({
+		inputRange: [0, 1],
+		outputRange: ['0deg', '360deg']
+	})
 
 	const handleLoadStart = useCallback(() => {
 		setIsLoading(true)
@@ -186,35 +214,46 @@ const BrowserScreen = () => {
 		<>
 			<SafeAreaView style={styles.root}>
 				<StatusBar barStyle="light-content" backgroundColor={colors.bg0} />
-				<View style={styles.urlBar}>
-					<View style={styles.urlIcon}>
-						<Text style={styles.urlIconText}>◎</Text>
+				<View style={styles.urlBarContainer}>
+					<View style={[styles.urlPill, inputFocused && styles.urlPillFocused]}>
+						<Icon 
+							name={inputUrl.startsWith('https') ? 'lock-outline' : 'earth'} 
+							size={18} 
+							color={inputFocused ? colors.accent : colors.text1} 
+							style={styles.urlProtocolIcon} 
+						/>
+						<TextInput
+							ref={urlInputRef}
+							value={inputFocused ? inputUrl : (getDisplayUrl(activeTab?.url) || inputUrl)}
+							onChangeText={setInputUrl}
+							onFocus={() => {
+								setInputFocused(true)
+								setInputUrl(activeTab?.url === 'about:blank' ? '' : activeTab?.url || '')
+							}}
+							onBlur={() => {
+								setInputFocused(false)
+								setInputUrl(activeTab?.url === 'about:blank' ? '' : activeTab?.url || '')
+							}}
+							onSubmitEditing={handleSubmit}
+							placeholder="Search or type URL"
+							placeholderTextColor={colors.text2}
+							style={styles.urlInput}
+							selectTextOnFocus
+							autoCapitalize="none"
+							autoCorrect={false}
+							keyboardType="url"
+							returnKeyType="go"
+						/>
+						<Pressable onPress={handleRefreshStop} style={styles.urlBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+						{isLoading ? (
+						<Animated.View style={{ transform: [{ rotate: spinRotate }] }}>
+						  <Icon name="loading" size={18} color={colors.accent} />
+						</Animated.View>
+						) : (
+						<Icon name="refresh" size={18} color={colors.text1} />
+						)}
+						</Pressable>
 					</View>
-					<TextInput
-						ref={urlInputRef}
-						value={inputUrl}
-						onChangeText={setInputUrl}
-						onFocus={() => {
-							setInputFocused(true)
-							setInputUrl(activeTab?.url === 'about:blank' ? '' : activeTab?.url || '')
-						}}
-						onBlur={() => {
-							setInputFocused(false)
-							setInputUrl(activeTab?.url === 'about:blank' ? '' : activeTab?.url || '')
-						}}
-						onSubmitEditing={handleSubmit}
-						placeholder="Search or type URL"
-						placeholderTextColor={colors.text2}
-						style={styles.urlInput}
-						selectTextOnFocus
-						autoCapitalize="none"
-						autoCorrect={false}
-						keyboardType="url"
-						returnKeyType="go"
-					/>
-					<TouchableOpacity onPress={handleRefreshStop} style={styles.urlBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<Text style={styles.urlBtnText}>{isLoading ? '×' : '↻'}</Text>
-					</TouchableOpacity>
 				</View>
 				<View style={styles.progressTrack}>
 					<View style={[
@@ -250,33 +289,35 @@ const BrowserScreen = () => {
 						/>
 					))}
 				</View>
-				<View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-					<TouchableOpacity onPress={handleBack} style={styles.navBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<Text style={styles.navIcon}>‹</Text>
-					</TouchableOpacity>
-					<TouchableOpacity onPress={handleForward} style={styles.navBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<Text style={styles.navIcon}>›</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={() => { haptic(); activeTab && activeTab.url !== 'about:blank' && toggleBookmark(activeTab.url, activeTab.title) }}
-						style={styles.navBtn}
-						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<Text style={[styles.navIcon, { color: bookmarked ? colors.accent : colors.text1 }]}>{bookmarked ? '★' : '☆'}</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={() => { haptic(); setShowTabs(true) }}
-						style={styles.navBtn}
-						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<View style={styles.tabsBadge}>
-							<Text style={styles.tabsBadgeText}>{tabs.length}</Text>
-						</View>
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={() => { haptic(); setShowMenu(true) }}
-						style={styles.navBtn}
-						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-						<Text style={styles.navIcon}>⋯</Text>
-					</TouchableOpacity>
+				<View style={[styles.bottomNavWrap, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+					<View style={styles.bottomNav}>
+						<Pressable onPress={handleBack} style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Icon name="chevron-left" size={24} color={colors.text1} />
+						</Pressable>
+						<Pressable onPress={handleForward} style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Icon name="chevron-right" size={24} color={colors.text1} />
+						</Pressable>
+						<Pressable
+							onPress={() => { haptic(); activeTab && activeTab.url !== 'about:blank' && toggleBookmark(activeTab.url, activeTab.title) }}
+							style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? colors.accent : colors.text1} />
+						</Pressable>
+						<Pressable
+							onPress={() => { haptic(); setShowTabs(true) }}
+							style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<View style={styles.tabsBadge}>
+								<Text style={styles.tabsBadgeText}>{tabs.length}</Text>
+							</View>
+						</Pressable>
+						<Pressable
+							onPress={() => { haptic(); setShowMenu(true) }}
+							style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Icon name="dots-horizontal" size={24} color={colors.text1} />
+						</Pressable>
+					</View>
 				</View>
 			</SafeAreaView>
 
@@ -292,35 +333,49 @@ const BrowserScreen = () => {
 				onNavigate={loadUrl}
 			/>
 
-			<Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+			<Modal visible={showMenu} transparent animationType="slide" onRequestClose={() => setShowMenu(false)}>
 				<Pressable style={styles.menuBackdrop} onPress={() => setShowMenu(false)} />
-				<View style={[styles.menu, { bottom: 64 + Math.max(insets.bottom, spacing.sm) }]}>
-					<MenuItem label="New Tab" onPress={() => handleMenuAction('new-tab')} />
-					<MenuItem
-						label={bookmarked ? 'Remove Bookmark' : 'Add Bookmark'}
-						accent={bookmarked}
-						onPress={() => handleMenuAction('toggle-bookmark')}
-					/>
-					<MenuItem label="Bookmarks" onPress={() => handleMenuAction('bookmarks')} />
-					<MenuItem label="History" onPress={() => handleMenuAction('history')} />
-					<MenuItem
-						label={settings.desktopMode ? 'Mobile Site' : 'Desktop Site'}
-						onPress={() => handleMenuAction('desktop')}
-					/>
-					<MenuItem label="Share" onPress={() => handleMenuAction('share')} />
-					<MenuItem label="Copy URL" onPress={() => handleMenuAction('copy-url')} />
-					<MenuItem label="Copy Cookies" onPress={() => handleMenuAction('copy-cookies')} />
-					<MenuItem label="Clear Data" onPress={() => handleMenuAction('clear-data')} />
+				<View style={[styles.menu, { bottom: 80 + Math.max(insets.bottom, spacing.sm) }]}>
+					<View style={styles.menuGroup}>
+						<MenuItem icon="plus" label="New Tab" onPress={() => handleMenuAction('new-tab')} />
+					</View>
+					<View style={styles.menuSeparator} />
+					<View style={styles.menuGroup}>
+						<MenuItem
+							icon={bookmarked ? 'bookmark' : 'bookmark-outline'}
+							label={bookmarked ? 'Remove Bookmark' : 'Add Bookmark'}
+							accent={bookmarked}
+							onPress={() => handleMenuAction('toggle-bookmark')}
+						/>
+						<MenuItem icon="book-open-outline" label="Bookmarks" onPress={() => handleMenuAction('bookmarks')} />
+						<MenuItem icon="history" label="History" onPress={() => handleMenuAction('history')} />
+					</View>
+					<View style={styles.menuSeparator} />
+					<View style={styles.menuGroup}>
+						<MenuItem
+							icon={settings.desktopMode ? 'monitor' : 'cellphone'}
+							label={settings.desktopMode ? 'Mobile Site' : 'Desktop Site'}
+							onPress={() => handleMenuAction('desktop')}
+						/>
+						<MenuItem icon="share-variant" label="Share" onPress={() => handleMenuAction('share')} />
+						<MenuItem icon="link" label="Copy URL" onPress={() => handleMenuAction('copy-url')} />
+						<MenuItem icon="cookie-outline" label="Copy Cookies" onPress={() => handleMenuAction('copy-cookies')} />
+					</View>
+					<View style={styles.menuSeparator} />
+					<View style={styles.menuGroup}>
+						<MenuItem icon="delete-outline" label="Clear Data" onPress={() => handleMenuAction('clear-data')} />
+					</View>
 				</View>
 			</Modal>
 		</>
 	)
 }
 
-const MenuItem = ({ label, onPress, accent }) => (
-	<TouchableOpacity onPress={onPress} style={styles.menuItem} activeOpacity={0.7}>
+const MenuItem = ({ icon, label, onPress, accent }) => (
+	<Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, accent && styles.menuItemAccent, pressed && { backgroundColor: colors.bg3 }]}>
+		<Icon name={icon} size={20} color={accent ? colors.accent : colors.text1} style={styles.menuItemIcon} />
 		<Text style={[styles.menuItemText, accent && { color: colors.accent }]}>{label}</Text>
-	</TouchableOpacity>
+	</Pressable>
 )
 
 const styles = StyleSheet.create({
@@ -328,59 +383,51 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.bg0,
 	},
-	urlBar: {
-		flexDirection: 'row',
-		alignItems: 'center',
+	urlBarContainer: {
 		paddingHorizontal: spacing.md,
 		paddingVertical: spacing.sm,
 		backgroundColor: colors.bg1,
-		borderBottomWidth: 1,
-		borderBottomColor: colors.border0,
 	},
-	urlIcon: {
-		width: 28,
-		height: 28,
+	urlPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		height: 42,
 		borderRadius: radius.full,
 		backgroundColor: colors.bg2,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: spacing.sm,
+		borderWidth: 1,
+		borderColor: colors.border1,
+		paddingHorizontal: spacing.sm,
 	},
-	urlIconText: {
-		color: colors.accent,
-		fontSize: font.md,
+	urlPillFocused: {
+		borderColor: colors.accent,
+		backgroundColor: colors.accentSoft,
+	},
+	urlProtocolIcon: {
+		paddingHorizontal: spacing.xs,
 	},
 	urlInput: {
 		flex: 1,
 		color: colors.text0,
 		fontSize: font.md,
-		paddingHorizontal: spacing.md,
-		paddingVertical: spacing.sm,
-		backgroundColor: colors.bg2,
-		borderRadius: radius.md,
-		borderWidth: 1,
-		borderColor: colors.border0,
+		paddingHorizontal: spacing.xs,
+		height: '100%',
 	},
 	urlBtn: {
-		marginLeft: spacing.sm,
-		width: 36,
-		height: 36,
-		borderRadius: radius.full,
+		padding: spacing.xs,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: colors.bg2,
-	},
-	urlBtnText: {
-		color: colors.text0,
-		fontSize: font.lg,
 	},
 	progressTrack: {
-		height: 2,
+		height: 3,
 		backgroundColor: 'transparent',
 	},
 	progressFill: {
-		height: 2,
+		height: 3,
 		backgroundColor: colors.accent,
+		shadowColor: colors.accent,
+		shadowOpacity: 0.6,
+		shadowRadius: 4,
+		elevation: 2,
 	},
 	webviewLayer: {
 		flex: 1,
@@ -390,32 +437,43 @@ const styles = StyleSheet.create({
 		...StyleSheet.absoluteFillObject,
 		backgroundColor: colors.bg0,
 	},
-	bottomNav: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-around',
+	bottomNavWrap: {
 		backgroundColor: colors.bg1,
 		borderTopWidth: 1,
 		borderTopColor: colors.border0,
 		paddingTop: spacing.sm,
 	},
+	bottomNav: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-around',
+		backgroundColor: colors.bg2,
+		borderWidth: 1,
+		borderColor: colors.border1,
+		borderRadius: radius.lg,
+		marginHorizontal: 16,
+		marginBottom: 8,
+		height: 56,
+		...shadow.md,
+	},
 	navBtn: {
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: spacing.sm,
+		height: '100%',
+		borderRadius: radius.lg,
 	},
-	navIcon: {
-		color: colors.text1,
-		fontSize: font.xl,
+	navBtnPressed: {
+		backgroundColor: colors.bg3,
 	},
 	tabsBadge: {
 		minWidth: 24,
 		height: 24,
 		paddingHorizontal: spacing.xs,
 		borderRadius: radius.sm,
-		borderWidth: 1.5,
-		borderColor: colors.text1,
+		backgroundColor: colors.bg3,
+		borderWidth: 1,
+		borderColor: colors.border2,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -426,12 +484,12 @@ const styles = StyleSheet.create({
 	},
 	menuBackdrop: {
 		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(0,0,0,0.4)',
+		backgroundColor: 'rgba(0,0,0,0.6)',
 	},
 	menu: {
 		position: 'absolute',
 		right: spacing.md,
-		minWidth: 200,
+		minWidth: 220,
 		backgroundColor: colors.bg2,
 		borderRadius: radius.md,
 		borderWidth: 1,
@@ -439,9 +497,26 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.xs,
 		...shadow.md,
 	},
+	menuGroup: {
+		paddingVertical: spacing.xs,
+	},
+	menuSeparator: {
+		borderBottomWidth: 0.5,
+		borderBottomColor: colors.border0,
+	},
 	menuItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
 		paddingHorizontal: spacing.lg,
 		paddingVertical: spacing.md,
+		borderLeftWidth: 3,
+		borderLeftColor: 'transparent',
+	},
+	menuItemAccent: {
+		borderLeftColor: colors.accent,
+	},
+	menuItemIcon: {
+		marginRight: spacing.md,
 	},
 	menuItemText: {
 		color: colors.text0,
